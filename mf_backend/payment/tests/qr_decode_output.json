@@ -1,1 +1,0 @@
-{"statuscode":200,"status":true,"responsecode":1,"data":{"refid":"123456789","sender_name":"Money sender","sender_vpa":"cpy.radian@fin","receiver_name":"Radian Finserv","receiver_vpa":"cpy.radian@fin","txnid":"259275","upiRefId":null,"amount":"100.00","remarks":"UPI Collect","status":2,"utr":null,"msg":"Transaction initiated successfully"}}

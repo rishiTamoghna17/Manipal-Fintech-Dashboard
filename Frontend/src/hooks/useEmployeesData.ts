@@ -31,15 +31,12 @@ export const useEmployeesData = (): UseEmployeesDataReturn => {
     }
 
     const baseUrl = getApiBaseUrl();
-    const headers = getAuthHeaders();
 
     try {
+      const headers = await getAuthHeaders();
       const buildUrl = (base: string, path: string) => {
         const cleanBase = base.replace(/\/+$/, '');
-        let cleanPath = path.replace(/^\/+/, '');
-        if ((cleanBase.endsWith('/api') || cleanBase.endsWith('/api-proxy')) && cleanPath.startsWith('api/')) {
-          cleanPath = cleanPath.substring(4);
-        }
+        const cleanPath = path.replace(/^\/+/, '');
         return `${cleanBase}/${cleanPath}`;
       };
 

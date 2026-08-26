@@ -74,15 +74,12 @@ export const MapSection: React.FC<MapSectionProps> = ({ stats, darkMode }) => {
     setLoadingStateMetrics(uppercaseState);
 
     const baseUrl = getApiBaseUrl();
-    const headers = getAuthHeaders();
 
     try {
+      const headers = await getAuthHeaders();
       const cleanBase = baseUrl.replace(/\/+$/, '');
       const makeUrl = (path: string) => {
-        let endpoint = path;
-        if (cleanBase.endsWith('/api') && path.startsWith('api/')) {
-          endpoint = path.substring(4);
-        }
+        const endpoint = path.replace(/^\/+/, '');
         return `${cleanBase}/${endpoint}`;
       };
 

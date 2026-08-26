@@ -9,7 +9,6 @@ interface SettingsTabProps {
 
 const SettingsTab: React.FC<SettingsTabProps> = ({ darkMode, toggleDark }) => {
   const baseUrl = getApiBaseUrl();
-  const [bearerToken, setBearerToken] = useState(getAuthToken());
   const [notifications, setNotifications] = useState({ email: true, slack: false, weekly: true, alerts: true });
   const [dataRefresh, setDataRefresh] = useState('5');
   const [saved, setSaved] = useState(false);
@@ -22,9 +21,6 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ darkMode, toggleDark }) => {
   const [dateFormat, setDateFormat] = useState('DD/MM/YYYY');
 
   const handleSave = () => {
-    if (typeof window !== 'undefined' && bearerToken) {
-      sessionStorage.setItem('manipal_bearer_token', bearerToken);
-    }
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   };
@@ -32,12 +28,13 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ darkMode, toggleDark }) => {
   const handleTestConnection = async () => {
     setTestStatus('testing');
     try {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (bearerToken) {
-        headers['Authorization'] = `Bearer ${bearerToken}`;
-      }
+      const bearerToken = await getAuthToken();
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${bearerToken}`,
+      };
       const cleanBase = baseUrl.replace(/\/+$/, '');
-      const endpoint = cleanBase.endsWith('/api') ? `${cleanBase}/v2/onboarding/leads/list/` : `${cleanBase}/api/v2/onboarding/leads/list/`;
+      const endpoint = `${cleanBase}/api/v2/onboarding/leads/list/`;
       const res = await fetch(endpoint, { headers });
       setTestStatus(res.ok ? 'ok' : 'fail');
     } catch {
@@ -93,9 +90,8 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ darkMode, toggleDark }) => {
             </label>
             <input
               type="password"
-              value={bearerToken}
-              onChange={e => setBearerToken(e.target.value)}
-              placeholder="Enter your Bearer Token (or set VITE_BEARER_TOKEN in .env)..."
+              value="Automatically obtained from /user/login/"
+              readOnly
               className={`w-full px-3 py-2 rounded-xl border text-xs font-mono ${darkMode ? 'bg-gray-700 border-gray-600 text-gray-200 placeholder:text-gray-500' : 'bg-white border-gray-200 text-gray-700 placeholder:text-gray-400'} outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20`}
             />
             <p className={`text-xs mt-1 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>

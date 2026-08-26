@@ -1,9 +1,0 @@
-version: "3"
-services:
-  backup_service:
-    environment:
-      POSTGRES_PASSWORD: radian1234
-      POSTGRES_USER: radian
-      POSTGRES_DB: radian
-    volumes:
-      - postgres_backup.sh

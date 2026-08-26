@@ -96,10 +96,7 @@ const POLL_INTERVAL_MS = 20 * 1000;
 
 export const buildUrl = (baseUrl: string, endpoint: string): string => {
   const cleanBase = baseUrl.replace(/\/+$/, '');
-  let cleanEndpoint = endpoint.replace(/^\/+/, '');
-  if ((cleanBase.endsWith('/api') || cleanBase.endsWith('/api-proxy')) && cleanEndpoint.startsWith('api/')) {
-    cleanEndpoint = cleanEndpoint.substring(4);
-  }
+  const cleanEndpoint = endpoint.replace(/^\/+/, '');
   return `${cleanBase}/${cleanEndpoint}`;
 };
 
@@ -256,8 +253,6 @@ export const useDashboardStats = (fromDate?: string, toDate?: string): UseDashbo
     }
 
     const baseUrl = getApiBaseUrl();
-    const headers = getAuthHeaders();
-
     const params = new URLSearchParams();
     if (fromDate) {
       params.set('start_date', fromDate);
@@ -274,6 +269,7 @@ export const useDashboardStats = (fromDate?: string, toDate?: string): UseDashbo
     const startTime = performance.now();
 
     try {
+      const headers = await getAuthHeaders();
       // Helper function to fetch all paginated records for an endpoint
       const fetchAllPages = async (path: string, keyExtractor: (item: any) => string) => {
         let currentUrl: string | null = buildUrl(baseUrl, `${path}${qs}`);
