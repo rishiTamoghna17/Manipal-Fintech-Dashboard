@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api-proxy/:path*",
-      "destination": "https://manipal.getafixtechnologies.com/api/:path*"
+      "destination": "https://devmanipal.getafixtechnologies.com/api/:path*"
     },
     {
       "source": "/(.*)",

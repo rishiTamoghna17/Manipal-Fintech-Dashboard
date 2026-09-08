@@ -8,7 +8,7 @@ export const getApiBaseUrl = (): string => {
   const configuredUrl = import.meta.env.VITE_MANIPAL_API_BASE_URL || import.meta.env.VITE_API_BASE_URL;
   if (configuredUrl) return configuredUrl.replace(/\/+$/, '');
   if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) return '/api-proxy';
-  return 'https://manipal.getafixtechnologies.com/api';
+  return 'https://devmanipal.getafixtechnologies.com/api';
 };
 
 const getTokenStorageKey = (): string => `manipal_api_access_token:${getApiBaseUrl()}`;
