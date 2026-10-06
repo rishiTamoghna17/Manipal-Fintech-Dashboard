@@ -1,0 +1,19 @@
+# Deploy:
+#   docker compose -f docker/docker-compose.yml build --no-cache
+#   docker compose -f docker/docker-compose.yml up -d
+
+services:
+  manipal_dashboard:
+    build:
+      context: ../
+      dockerfile: docker/dockerfile
+    image: manipal_dashboard:${BUILD_MODE:-development}
+    container_name: manipal_dashboard_${BUILD_MODE:-development}
+    restart: unless-stopped
+    ports:
+      - 8090:80
+
+networks:
+  default:
+    name: manipal_network
+    external: true
