@@ -4,18 +4,18 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
-    # Docker embedded DNS first, public resolver as fallback (upstream API is external).
+    # Docker embedded DNS first, public resolver as fallback.
     resolver 127.0.0.11 8.8.8.8 ipv6=off valid=30s;
-    set $manipal_api https://devmanipal.getafixtechnologies.com;
+    set $manipal_api ${API_PROXY_TARGET};
 
-    # Same-origin proxy to the Manipal API — mirrors the Vercel /api-proxy rewrite
-    # so the browser never makes a cross-origin request.
+    # Same-origin proxy to the Manipal API. The browser only ever calls this
+    # path, so no cross-origin request (and therefore no CORS) is possible.
     location ^~ /api-proxy/ {
         rewrite ^/api-proxy/(.*)$ /api/$1 break;
         proxy_pass $manipal_api;
         proxy_http_version 1.1;
         proxy_ssl_server_name on;
-        proxy_set_header Host devmanipal.getafixtechnologies.com;
+        proxy_set_header Host ${API_PROXY_HOST};
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;

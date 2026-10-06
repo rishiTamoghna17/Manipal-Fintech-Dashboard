@@ -1,6 +1,8 @@
 # Deploy:
 #   docker compose -f docker/docker-compose.yml build --no-cache
 #   docker compose -f docker/docker-compose.yml up -d
+#
+# To switch backends, change API_PROXY_* in docker/.env and `up -d` (no rebuild).
 
 services:
   manipal_dashboard:
@@ -10,6 +12,9 @@ services:
     image: manipal_dashboard:${BUILD_MODE:-development}
     container_name: manipal_dashboard_${BUILD_MODE:-development}
     restart: unless-stopped
+    environment:
+      API_PROXY_TARGET: ${API_PROXY_TARGET:-https://devmanipal.getafixtechnologies.com}
+      API_PROXY_HOST: ${API_PROXY_HOST:-devmanipal.getafixtechnologies.com}
     ports:
       - 8090:80
 
