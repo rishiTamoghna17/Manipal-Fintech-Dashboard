@@ -94,6 +94,89 @@ interface UseDashboardStatsReturn {
 
 const POLL_INTERVAL_MS = 20 * 1000;
 
+// Every count, breakdown and sum now comes from /dashboard/summary/, which the
+// backend computes in SQL. The list endpoints are only still called for the rows
+// the tables render, so we no longer walk 10 pages per endpoint on every poll.
+const LIST_PAGES = 2;
+const LIST_PAGE_SIZE = 200;
+
+/**
+ * Overlay the server-computed aggregates on top of the client-derived ones.
+ *
+ * /dashboard/summary/ aggregates the full table in SQL, so it is both cheaper and
+ * more accurate than anything derived from a few pages of rows. If it is missing a
+ * field - or the whole call failed and `summary` is null - the client-derived value
+ * is kept, so the dashboard degrades instead of going blank.
+ */
+const mergeSummary = (
+  stats: ComprehensiveDashboardStats,
+  summary: any,
+): ComprehensiveDashboardStats => {
+  if (!summary) return stats;
+  const o = summary.overview || {};
+  const l = summary.leadsStats || {};
+  const a = summary.applicationsStats || {};
+  const num = (v: any, fallback: number) =>
+    typeof v === 'number' && !Number.isNaN(v) ? v : fallback;
+  const arr = <T,>(v: any, fallback: T[]): T[] =>
+    Array.isArray(v) && v.length > 0 ? v : fallback;
+
+  return {
+    ...stats,
+    overview: {
+      ...stats.overview,
+      totalLeads: num(o.totalLeads, stats.overview.totalLeads),
+      totalApplications: num(o.totalApplications, stats.overview.totalApplications),
+      approvedApplications: num(o.approvedApplications, stats.overview.approvedApplications),
+      disbursedApplications: num(o.disbursedApplications, stats.overview.disbursedApplications),
+      conversionRatePct: num(o.conversionRatePct, stats.overview.conversionRatePct),
+      totalApplicationAmount: num(
+        o.totalApplicationAmount,
+        stats.overview.totalApplicationAmount,
+      ),
+      totalDisbursedAmount: num(o.totalDisbursedAmount, stats.overview.totalDisbursedAmount),
+      totalOnboardedPartners: num(
+        o.totalOnboardedPartners,
+        stats.overview.totalOnboardedPartners,
+      ),
+    },
+    leadsStats: {
+      ...stats.leadsStats,
+      total: num(l.total, stats.leadsStats.total),
+      conversionCount: num(l.conversionCount, stats.leadsStats.conversionCount),
+      assignedVsUnassigned: l.assignedVsUnassigned || stats.leadsStats.assignedVsUnassigned,
+      byStatus: arr(l.byStatus, stats.leadsStats.byStatus),
+      bySource: arr(l.bySource, stats.leadsStats.bySource),
+      byProductCategory: arr(l.byProductCategory, stats.leadsStats.byProductCategory),
+      byProductSubcategory: arr(l.byProductSubcategory, stats.leadsStats.byProductSubcategory),
+      byLendingPartner: arr(l.byLendingPartner, stats.leadsStats.byLendingPartner),
+      byState: arr(l.byState, stats.leadsStats.byState),
+      byLeadType: arr(l.byLeadType, stats.leadsStats.byLeadType),
+      monthlyTrend: arr(l.monthlyTrend, stats.leadsStats.monthlyTrend),
+    },
+    applicationsStats: {
+      ...stats.applicationsStats,
+      total: num(a.total, stats.applicationsStats.total),
+      approvedCount: num(a.approvedCount, stats.applicationsStats.approvedCount),
+      rejectedCount: num(a.rejectedCount, stats.applicationsStats.rejectedCount),
+      inProgressCount: num(a.inProgressCount, stats.applicationsStats.inProgressCount),
+      disbursedCount: num(a.disbursedCount, stats.applicationsStats.disbursedCount),
+      totalAmount: num(a.totalAmount, stats.applicationsStats.totalAmount),
+      totalDisbursedAmount: num(
+        a.totalDisbursedAmount,
+        stats.applicationsStats.totalDisbursedAmount,
+      ),
+      byStatus: arr(a.byStatus, stats.applicationsStats.byStatus),
+      byLendingPartner: arr(a.byLendingPartner, stats.applicationsStats.byLendingPartner),
+      byLoanType: arr(a.byLoanType, stats.applicationsStats.byLoanType),
+      byProductCategory: arr(a.byProductCategory, stats.applicationsStats.byProductCategory),
+      byState: arr(a.byState, stats.applicationsStats.byState),
+      byBranch: arr(a.byBranch, stats.applicationsStats.byBranch),
+      monthlyTrend: arr(a.monthlyTrend, stats.applicationsStats.monthlyTrend),
+    },
+  };
+};
+
 export const buildUrl = (baseUrl: string, endpoint: string): string => {
   const cleanBase = baseUrl.replace(/\/+$/, '');
   const cleanEndpoint = endpoint.replace(/^\/+/, '');
@@ -262,21 +345,24 @@ export const useDashboardStats = (fromDate?: string, toDate?: string): UseDashbo
       params.set('end_date', toDate);
       params.set('to_date', toDate);
     }
-    params.set('page_size', '100');
-    params.set('limit', '100');
+    params.set('page_size', String(LIST_PAGE_SIZE));
+    params.set('limit', String(LIST_PAGE_SIZE));
     const qs = `?${params.toString()}`;
 
     const startTime = performance.now();
 
     try {
       const headers = await getAuthHeaders();
+      // Each endpoint's server-reported total, kept so the headline counts never
+      // depend on how many rows we actually pulled down.
+      const apiCounts: Record<string, number> = {};
       // Helper function to fetch all paginated records for an endpoint
       const fetchAllPages = async (path: string, keyExtractor: (item: any) => string) => {
         let currentUrl: string | null = buildUrl(baseUrl, `${path}${qs}`);
         const itemsMap = new Map<string, any>();
         let pagesFetched = 0;
         let apiTotalCount = 0;
-        const MAX_PAGES = 10;
+        const MAX_PAGES = LIST_PAGES;
 
         while (currentUrl && pagesFetched < MAX_PAGES) {
           pagesFetched++;
@@ -331,14 +417,37 @@ export const useDashboardStats = (fromDate?: string, toDate?: string): UseDashbo
             currentUrl = null;
           }
         }
+        if (apiTotalCount > 0) apiCounts[path] = apiTotalCount;
         return Array.from(itemsMap.values());
       };
 
-      const [rawLeads, rawApps, rawEmployees, rawPartners] = await Promise.all([
+      // Server-side aggregates. One small request replaces walking every page of
+      // leads and applications just to count them. Returns null on any failure so
+      // the client-derived numbers below remain as a fallback.
+      const fetchSummary = async (): Promise<any | null> => {
+        try {
+          const res = await fetch(
+            buildUrl(baseUrl, `api/v2/onboarding/dashboard/summary/${qs}`),
+            { headers },
+          );
+          if (!res.ok) {
+            console.warn(`[DashboardStats] summary endpoint returned ${res.status}`);
+            return null;
+          }
+          const body = await res.json();
+          return body?.data ?? body ?? null;
+        } catch (e: any) {
+          console.warn('[DashboardStats] summary endpoint unavailable:', e?.message);
+          return null;
+        }
+      };
+
+      const [rawLeads, rawApps, rawEmployees, rawPartners, summary] = await Promise.all([
         fetchAllPages('api/v2/onboarding/leads/list/', (l) => String(l.id || l.lead_code || '')),
         fetchAllPages('api/v2/onboarding/applications/list/', (a) => String(a.application_id || '')),
         fetchAllPages('user/employee', (e) => String(e.user_id || e.id || e.employee_id || e.username || '')),
         fetchAllPages('api/v2/onboarding/lending-partners/', (p) => String(p.id || p.bank_name || '')),
+        fetchSummary(),
       ]);
 
       // ── Process Lending Partners Data ──────────────
@@ -747,9 +856,13 @@ export const useDashboardStats = (fromDate?: string, toDate?: string): UseDashbo
       });
       const leadConversionCount = convertedLeadsSet.size;
 
-      const totalLeadsCount = processedLeads.length;
-      const totalAppsCount = processedApps.length;
-      const totalEmpCount = processedEmployees.length;
+      // Prefer the server's own count: we deliberately fetch only the first pages,
+      // so row length under-reports the real total.
+      const totalLeadsCount =
+        apiCounts['api/v2/onboarding/leads/list/'] || processedLeads.length;
+      const totalAppsCount =
+        apiCounts['api/v2/onboarding/applications/list/'] || processedApps.length;
+      const totalEmpCount = apiCounts['user/employee'] || processedEmployees.length;
       const eligibleLeadsCount = Math.max(0, totalLeadsCount - notEligibleLeadsCount);
       const conversionRatePct = totalLeadsCount > 0 ? Math.round((totalAppsCount / totalLeadsCount) * 100) : 0;
 
@@ -894,7 +1007,7 @@ export const useDashboardStats = (fromDate?: string, toDate?: string): UseDashbo
         );
       }
 
-      setStats({
+      setStats(mergeSummary({
         overview: {
           totalEmployees: totalEmpCount,
           activeEmployees: activeEmployeesCount || totalEmpCount,
@@ -963,7 +1076,7 @@ export const useDashboardStats = (fromDate?: string, toDate?: string): UseDashbo
         applicationsList: processedApps,
         leadsList: processedLeads,
         employeesList: processedEmployees,
-      });
+      }, summary));
 
       setLastSync(new Date());
       setError(null);
