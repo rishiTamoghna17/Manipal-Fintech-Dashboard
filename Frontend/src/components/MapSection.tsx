@@ -230,13 +230,16 @@ export const MapSection: React.FC<MapSectionProps> = ({ stats, darkMode }) => {
               style={{ width: '100%', height: '100%', background: darkMode ? '#111827' : '#f8fafc' }}
               scrollWheelZoom={false}
             >
+              {/*
+                CARTO basemaps now require an API key and serve an "API KEY
+                REQUIRED" watermark tile instead (still HTTP 200), so we use
+                OpenStreetMap's keyless tiles. OSM has no dark variant, so dark
+                mode inverts the tiles in CSS rather than adding another provider.
+              */}
               <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                url={
-                  darkMode
-                    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-                    : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
-                }
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                className={darkMode ? 'map-tiles-dark' : undefined}
               />
               {stateDataList.map((st, idx) => {
                 const coords = getCoordinatesForState(st.state, idx);

@@ -12,7 +12,7 @@ interface UseEmployeesDataReturn {
   lastSync: Date | null;
 }
 
-const POLL_INTERVAL_MS = 30 * 1000;
+const POLL_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 
 export const useEmployeesData = (): UseEmployeesDataReturn => {
   const [employees, setEmployees] = useState<Employee[]>([]);

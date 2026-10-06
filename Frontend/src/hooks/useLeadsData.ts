@@ -12,7 +12,7 @@ interface UseLeadsDataReturn {
   lastSync: Date | null;
 }
 
-const POLL_INTERVAL_MS = 15 * 1000; // 15 seconds
+const POLL_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 
 const mapBackendLeadToFrontend = (lead: any): Lead => {
   const status = (lead.status || 'DRAFT').toUpperCase();

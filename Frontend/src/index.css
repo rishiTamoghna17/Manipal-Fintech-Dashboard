@@ -140,3 +140,10 @@ body {
   border: 1px solid #e5e7eb !important;
   box-shadow: 0 4px 24px rgba(0,0,0,0.08) !important;
 }
+
+/* OpenStreetMap has no dark basemap, so invert its tiles for dark mode.
+   The second hue-rotate puts the (inverted) blues and greens back near
+   their original hues instead of leaving water orange. */
+.map-tiles-dark {
+  filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.95) saturate(0.8);
+}

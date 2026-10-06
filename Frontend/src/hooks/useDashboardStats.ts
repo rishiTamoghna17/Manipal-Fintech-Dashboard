@@ -92,7 +92,7 @@ interface UseDashboardStatsReturn {
   apiLatencyMs: number | null;
 }
 
-const POLL_INTERVAL_MS = 20 * 1000;
+const POLL_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 
 // Every count, breakdown and sum now comes from /dashboard/summary/, which the
 // backend computes in SQL. The list endpoints are only still called for the rows
